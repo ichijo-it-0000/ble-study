@@ -22,6 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BleScannerSample"
+rootProject.name = "BleConnector"
 include(":app")
- 
