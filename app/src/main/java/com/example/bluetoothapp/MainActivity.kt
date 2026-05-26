@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.widget.addTextChangedListener
 import androidx.activity.ComponentActivity
@@ -17,7 +16,10 @@ import android.widget.RadioGroup
 import android.util.Log
 import com.example.bluetoothapp.ble.BleManager
 import com.example.bluetoothapp.permission.BlePermissionManager
-
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.platform.ComposeView
+import com.example.bluetoothapp.ble.BleDevice
+import com.example.bluetoothapp.ui.DeviceList
 
 enum class SortType {
     LAST_SEEN,
@@ -45,6 +47,8 @@ class MainActivity : ComponentActivity() {
 
     private var filterText = ""
     private var sortType = SortType.LAST_SEEN
+    private lateinit var composeView: ComposeView
+    private val visibleDevices = mutableStateListOf<BleDevice>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,14 +100,20 @@ class MainActivity : ComponentActivity() {
 
         rootLayout.addView(radioArea)
 
-        val scrollView = ScrollView(this)
+        composeView = ComposeView(this)
 
-        logTextView = TextView(this)
-        scrollView.addView(logTextView)
-
-        rootLayout.addView(scrollView)
+        rootLayout.addView(
+            composeView,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        )
 
         setContentView(rootLayout)
+        composeView.setContent {
+            DeviceList(
+                devices = visibleDevices,
+                onDeviceClick = { device -> Log.d("MainActivity", "CLICK : ${device.address}")}
+            )
+        }
     }
 
     private fun initializeBle(): Boolean {
@@ -188,14 +198,12 @@ class MainActivity : ComponentActivity() {
         }
 
         runOnUiThread {
-            val builder = StringBuilder()
-            devices.filter{
-                filterText.isBlank() || it.name.contains(filterText, ignoreCase = true)
-            }.forEach { device ->
-                builder.append(" NAME : ${device.name}\nRSSI : ${device.rssi}\nMAC  : ${device.address}".trimIndent())
-                builder.append("\n\n")
-            }
-            logTextView.text = builder.toString()
+            visibleDevices.clear()
+            visibleDevices.addAll(
+                devices.filter {
+                    filterText.isBlank() || it.name.contains(filterText, ignoreCase = true)
+                }
+            )
         }
     }
 }
