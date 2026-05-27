@@ -111,7 +111,8 @@ class MainActivity : ComponentActivity() {
         composeView.setContent {
             DeviceList(
                 devices = visibleDevices,
-                onDeviceClick = { device -> Log.d("MainActivity", "CLICK : ${device.address}")}
+                onConnect = { device -> bleManager.connect(device) },
+                onDisconnect = { device -> bleManager.disconnect(device) }
             )
         }
     }
@@ -129,6 +130,7 @@ class MainActivity : ComponentActivity() {
             return FAILURE
         }
         bleManager = BleManager(
+            context = this,
             bluetoothAdapter = bluetoothAdapter,
             onDevicesUpdated = { updateDeviceList() }
         )
@@ -157,6 +159,10 @@ class MainActivity : ComponentActivity() {
                 )
                 return@setOnClickListener
             }
+            Log.d(
+                "Permission",
+                BlePermissionManager.hasPermissions(this).toString()
+            )
             bleManager.startScan()
         }
 
@@ -167,6 +173,10 @@ class MainActivity : ComponentActivity() {
 
         filterEditText.addTextChangedListener{
             filterText = it.toString()
+            Log.d(
+                "FILTER",
+                "keyword=$filterText"
+            )
             updateDeviceList()
         }
 
@@ -199,10 +209,10 @@ class MainActivity : ComponentActivity() {
 
         runOnUiThread {
             visibleDevices.clear()
-            visibleDevices.addAll(
-                devices.filter {
-                    filterText.isBlank() || it.name.contains(filterText, ignoreCase = true)
-                }
+            val filteredDevices = devices.filter {
+                filterText.isBlank() || it.name.contains(filterText, ignoreCase = true)
+            }
+            visibleDevices.addAll(    filteredDevices.map { it.copy() }
             )
         }
     }

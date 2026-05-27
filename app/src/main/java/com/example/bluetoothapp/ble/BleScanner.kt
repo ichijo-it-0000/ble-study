@@ -7,6 +7,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import androidx.annotation.RequiresPermission
+import android.util.Log
 
 class BleScanner(
     private val bluetoothAdapter: BluetoothAdapter,
@@ -43,12 +44,24 @@ class BleScanner(
         @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val bleDevice = BleDevice(
+                bluetoothDevice = result.device,
                 address = result.device.address,
                 name = result.device.name ?: "UNKNOWN",
                 rssi = result.rssi,
                 lastSeen = System.currentTimeMillis()
             )
             onDeviceFound(bleDevice)
+        }
+
+        override fun onScanFailed(errorCode: Int) {
+            Log.e(
+                "BleScanner",
+                "SCAN FAILED : $errorCode"
+            )
+            Log.d(
+                "BleScanner",
+                "scanner=$bluetoothAdapter.bluetoothLeScanner"
+            )
         }
     }
 }

@@ -16,4 +16,8 @@ class DeviceRegistry {
     fun getDevices(): List<BleDevice> {
         return devices.values.toList()
     }
+
+    fun setConnectionState(address: String, state: ConnectionState) {
+        devices[address]?.connectionState = state
+    }
 }
