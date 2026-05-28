@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateListOf
 
 class DeviceManager {
     val devices = mutableStateListOf<BLEDevice>()
-    //private var lastUpdateTime = 0L
+    var selectedDevice: BLEDevice? = null
 
     //fun upsert(device: BLEDevice) {
     //    val index = devices.indexOfFirst {
@@ -22,23 +22,19 @@ class DeviceManager {
     //    }
     //}
     fun upsert(device: BLEDevice) {
-        //val now = System.currentTimeMillis()
-        //if (now - lastUpdateTime < 500) {
-        //    return
-        //}
-        //lastUpdateTime = now
+        val index = devices.indexOfFirst { it.address == device.address }
 
-        val index = devices.indexOfFirst {
-            it.address == device.address
-        }
         if (index == -1) {
             devices.add(device)
-        } else {
-            devices[index] = device
+            return
         }
-        devices.sortByDescending {
-            it.rssi
-        }
+
+        val old = devices[index]
+
+        // 完全一致なら更新しない（軽量化）
+        if (old == device) return
+
+        devices[index] = device
     }
 
     fun clear() {

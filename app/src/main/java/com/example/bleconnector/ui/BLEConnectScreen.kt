@@ -1,7 +1,6 @@
 package com.example.bleconnector.ui
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.foundation.layout.Column
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.navigation.NavController
 import com.example.bleconnector.BLEConnector
 import com.example.bleconnector.BLEScanner
 import com.example.bleconnector.DeviceManager
@@ -43,7 +43,8 @@ import com.example.bleconnector.ScanFilterState
 fun BLEConnectScreen(
     scanner: BLEScanner,
     connector: BLEConnector,
-    deviceManager: DeviceManager
+    deviceManager: DeviceManager,
+    navController: NavController
 ) {
     var isScanning by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -116,7 +117,6 @@ fun BLEConnectScreen(
 
                 onStopScan = {
                     scanner.stopScanBLEDevices(context)
-
                     isScanning = false
                 }
             )
@@ -178,14 +178,22 @@ fun BLEConnectScreen(
                 Spacer(
                     modifier = Modifier.height(8.dp)
                 )
+
+                val sortedDevices = deviceManager.devices
+                    .sortedByDescending { it.rssi }
+
                 LazyColumn {
                     items(
-                        items = deviceManager.devices,
+                        items = sortedDevices,
                         key = { it.address }
                     ) { device ->
                         DeviceCard(
                             device = device,
-                            onConnectClick = {connector.connect(it)}
+                            onConnectClick = { device ->
+                                deviceManager.selectedDevice = device
+                                connector.connect(device)
+                                navController.navigate("detail/${device.address}")
+                            }
                         )
                     }
                 }
