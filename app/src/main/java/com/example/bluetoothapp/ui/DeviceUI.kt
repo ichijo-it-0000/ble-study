@@ -20,11 +20,12 @@ import com.example.bluetoothapp.ble.ConnectionState
 fun DeviceList(
     devices: List<BleDevice>,
     onConnect: (BleDevice) -> Unit,
-    onDisconnect: (BleDevice) -> Unit
+    onDisconnect: (BleDevice) -> Unit,
+    onShowServices: (BleDevice) -> Unit
 ) {
     LazyColumn {
         items(devices) { device ->
-            DeviceCard(device = device, onConnect = onConnect, onDisconnect = onDisconnect)
+            DeviceCard(device = device, onConnect = onConnect, onDisconnect = onDisconnect, onShowServices = onShowServices)
         }
     }
 }
@@ -32,7 +33,8 @@ fun DeviceList(
 fun DeviceCard(
     device: BleDevice,
     onConnect: (BleDevice) -> Unit,
-    onDisconnect: (BleDevice) -> Unit
+    onDisconnect: (BleDevice) -> Unit,
+    onShowServices: (BleDevice) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
@@ -45,28 +47,45 @@ fun DeviceCard(
                     text = when (device.connectionState) {
                         ConnectionState.CONNECTED -> "🟢 Connected"
                         ConnectionState.CONNECTING -> "🟡 Connecting..."
+                        ConnectionState.DISCOVERING_SERVICES -> "🟣 Discovering Services..."
                         ConnectionState.DISCONNECTING -> "🟠 Disconnecting..."
                         ConnectionState.DISCONNECTED -> "⚪ Disconnected"
                     }
                 )
-                Button(
-                    enabled = device.connectionState != ConnectionState.CONNECTING &&
-                                device.connectionState != ConnectionState.DISCONNECTING,
-                    onClick = {
-                        if (device.connectionState == ConnectionState.CONNECTED) {
-                            onDisconnect(device)
-                        } else {
-                            onConnect(device)
+                Row (
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ){
+                    if (
+                        device.connectionState == ConnectionState.DISCOVERING_SERVICES ||
+                        device.connectionState == ConnectionState.CONNECTED
+                    ) {
+                        Button(
+                            enabled = device.connectionState == ConnectionState.CONNECTED,
+                            onClick = { onShowServices(device) }
+                        ) {
+                            Text("詳細")
                         }
                     }
-                ) {
-                    Text( when (device.connectionState) {
+                    Button(
+                        enabled = device.connectionState == ConnectionState.DISCONNECTED ||
+                                device.connectionState == ConnectionState.CONNECTED,
+                        onClick = {
+                            if (device.connectionState == ConnectionState.CONNECTED) {
+                                onDisconnect(device)
+                            } else {
+                                onConnect(device)
+                            }
+                        }
+                    ) {
+                        Text( when (device.connectionState) {
                             ConnectionState.CONNECTED -> "切断"
                             ConnectionState.DISCONNECTED -> "接続"
+                            ConnectionState.DISCOVERING_SERVICES -> "接続中..."
                             ConnectionState.CONNECTING -> "接続中..."
                             ConnectionState.DISCONNECTING -> "切断中..."
                         }
-                    )
+                        )
+                    }
                 }
             }
         }

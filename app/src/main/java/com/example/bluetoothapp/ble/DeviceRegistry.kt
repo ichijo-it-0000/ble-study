@@ -1,5 +1,6 @@
 package com.example.bluetoothapp.ble
 
+import android.util.Log
 class DeviceRegistry {
     private val devices = mutableMapOf<String, BleDevice>()
     fun addOrUpdate(device: BleDevice) {
@@ -18,6 +19,10 @@ class DeviceRegistry {
     }
 
     fun setConnectionState(address: String, state: ConnectionState) {
+        Log.d(
+            "Registry",
+            "address=$address state=$state"
+        )
         devices[address]?.connectionState = state
     }
 }

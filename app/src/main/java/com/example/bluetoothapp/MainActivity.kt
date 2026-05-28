@@ -20,7 +20,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.platform.ComposeView
 import com.example.bluetoothapp.ble.BleDevice
 import com.example.bluetoothapp.ui.DeviceList
-
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.remember
+import com.example.bluetoothapp.ble.ServiceInfo
+import com.example.bluetoothapp.ui.ServiceBottomSheet
 enum class SortType {
     LAST_SEEN,
     RSSI,
@@ -30,11 +34,11 @@ enum class SortType {
 private var SUCCESS = true
 private var FAILURE = false
 
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     private lateinit var bleManager: BleManager
 
-    private lateinit var logTextView: TextView
     private lateinit var filterEditText: EditText
 
     private lateinit var startButton: Button
@@ -49,6 +53,8 @@ class MainActivity : ComponentActivity() {
     private var sortType = SortType.LAST_SEEN
     private lateinit var composeView: ComposeView
     private val visibleDevices = mutableStateListOf<BleDevice>()
+    private val showServiceSheet = mutableStateOf(false)
+    private val selectedDevice = mutableStateOf<BleDevice?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,11 +115,25 @@ class MainActivity : ComponentActivity() {
 
         setContentView(rootLayout)
         composeView.setContent {
+            val serviceList = remember { mutableStateListOf<ServiceInfo>()}
+
             DeviceList(
                 devices = visibleDevices,
                 onConnect = { device -> bleManager.connect(device) },
-                onDisconnect = { device -> bleManager.disconnect(device) }
+                onDisconnect = { device -> bleManager.disconnect(device) },
+                onShowServices = { device ->
+                    serviceList.clear()
+                    serviceList.addAll( bleManager.getDiscoveredServices())
+                    selectedDevice.value = device
+                    showServiceSheet.value = true
+                }
             )
+            if (showServiceSheet.value) {
+                ServiceBottomSheet(
+                    services = serviceList,
+                    onDismiss = { showServiceSheet.value = false }
+                )
+            }
         }
     }
 

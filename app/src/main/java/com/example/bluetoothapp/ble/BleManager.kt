@@ -5,6 +5,8 @@ import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import androidx.annotation.RequiresPermission
 import android.util.Log
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattService
 
 class BleManager(
     private val context: Context,
@@ -25,7 +27,7 @@ class BleManager(
 
         onConnected = { device ->
             Log.i("BleManager", "CONNECTED : ${device.address}")
-            registry.setConnectionState(device.address, ConnectionState.CONNECTED)
+            registry.setConnectionState(device.address, ConnectionState.DISCOVERING_SERVICES)
             onDevicesUpdated()
         },
 
@@ -33,8 +35,16 @@ class BleManager(
             Log.i("BleManager", "DISCONNECTED : ${device.address}")
             registry.setConnectionState(device.address, ConnectionState.DISCONNECTED)
             onDevicesUpdated()
-        }
+        },
+        onServicesDiscovered = ::handleServicesDiscovered
     )
+
+    private var currentDeviceAddress: String? = null
+    private val discoveredServices = mutableListOf<ServiceInfo>()
+    fun getDiscoveredServices(): List<ServiceInfo> {
+        return discoveredServices
+    }
+
     fun startScan() {
         scanner.startScan()
     }
@@ -49,6 +59,7 @@ class BleManager(
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(device: BleDevice) {
+        currentDeviceAddress = device.address
         Log.i("BleManager", "CONNECT START : ${device.address}")
 
         registry.setConnectionState(device.address, ConnectionState.CONNECTING)
@@ -59,10 +70,76 @@ class BleManager(
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun disconnect(device: BleDevice) {
         Log.i("BleManager", "DISCONNECT START")
-
+        Log.d(
+            "BleManager",
+            "disconnect request state=${device.connectionState}"
+        )
         registry.setConnectionState(device.address, ConnectionState.DISCONNECTING)
         onDevicesUpdated()
         connector.disconnect()
     }
+    private val BATTERY_LEVEL_UUID = java.util.UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb")
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun handleServicesDiscovered(services: List<BluetoothGattService>) {
+        discoveredServices.clear()
+        Log.d("BleManager", "SERVICE COUNT = ${services.size}")
+        services.forEach { service ->
+            val serviceFullUuid = service.uuid.toString()
+            val serviceShortUuid = serviceFullUuid.substring(4, 8)
+            val serviceName = BleServiceNames.getName(serviceFullUuid)
+            val characteristicList = mutableListOf<CharacteristicInfo>()
 
+            Log.d("BLE", "SERVICE : $serviceName ($serviceShortUuid)")
+
+            service.characteristics.forEach { characteristic ->
+                val charaFullUuid = characteristic.uuid.toString()
+                val charaShortUuid = charaFullUuid.substring(4, 8)
+                val charaName = BleCharacteristicNames.getName(charaFullUuid)
+                Log.d("BLE", "$charaName ($charaShortUuid)")
+                characteristicList.add(
+                    CharacteristicInfo(
+                        name = charaName,
+                        uuid = charaFullUuid,
+                        properties = getPropertyNames(characteristic.properties)
+                    )
+                )
+
+                if (characteristic.uuid == BATTERY_LEVEL_UUID) {
+                    connector.readCharacteristic(
+                        characteristic
+                    )
+                }
+            }
+            discoveredServices.add(
+                ServiceInfo(
+                    name = serviceName,
+                    uuid = serviceFullUuid,
+                    characteristics = characteristicList
+                )
+            )
+        }
+        currentDeviceAddress?.let {
+        registry.setConnectionState(it, ConnectionState.CONNECTED)
+        onDevicesUpdated()
+        }
+    }
+
+    private fun getPropertyNames(properties: Int): String {
+
+        val names = mutableListOf<String>()
+
+        if (properties and BluetoothGattCharacteristic.PROPERTY_READ != 0) {
+            names.add("READ")
+        }
+
+        if (properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) {
+            names.add("WRITE")
+        }
+
+        if (properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) {
+            names.add("NOTIFY")
+        }
+
+        return names.joinToString(" | ")
+    }
 }

@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice
 enum class ConnectionState {
     DISCONNECTED,
     CONNECTING,
+    DISCOVERING_SERVICES,
     CONNECTED,
     DISCONNECTING
 }
