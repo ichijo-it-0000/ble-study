@@ -1,5 +1,7 @@
 package com.example.bluetoothapp.ble
 
+import android.bluetooth.BluetoothGattCharacteristic
+
 data class ServiceInfo(
     val name: String,
     val uuid: String,
@@ -9,7 +11,8 @@ data class ServiceInfo(
 data class CharacteristicInfo(
     val name: String,
     val uuid: String,
-    val properties: String
+    val properties: String,
+    val characteristic: BluetoothGattCharacteristic
 )
 
 object BleServiceNames {

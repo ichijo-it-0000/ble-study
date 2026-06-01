@@ -10,6 +10,8 @@ import android.bluetooth.BluetoothProfile
 import androidx.annotation.RequiresPermission
 import android.bluetooth.BluetoothGattService
 import android.util.Log
+import android.bluetooth.BluetoothGattDescriptor
+import java.util.UUID
 
 class BleConnector(
     private val context: Context,
@@ -18,6 +20,7 @@ class BleConnector(
     private val onServicesDiscovered: (List<BluetoothGattService>) -> Unit
 ) {
     private var gatt: BluetoothGatt? = null
+    private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(device: BluetoothDevice) {
@@ -42,6 +45,32 @@ class BleConnector(
             "BleConnector",
             "READ REQUEST uuid=${characteristic.uuid} result=$result"
         )
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun enableNotify(characteristic: BluetoothGattCharacteristic) {
+
+        val gatt = this.gatt ?: return
+
+        val result = gatt.setCharacteristicNotification(
+            characteristic,
+            true
+            )
+
+        Log.d(
+            "BLE_NOTIFY",
+            "setCharacteristicNotification=$result"
+        )
+
+        val descriptor = characteristic.getDescriptor(CCCD_UUID)
+
+        if (descriptor == null) {
+            Log.e("BLE_NOTIFY", "CCCD not found")
+            return
+        }
+
+        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        gatt.writeDescriptor(descriptor)
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -100,11 +129,44 @@ class BleConnector(
                     "%02X".format(it)
                 }
             )
+            val prop = characteristic.properties
+            Log.d("BLE_PROP","$prop")
             val battery = value[0].toInt() and 0xFF
 
             Log.d(
                 "BLE",
                 "Battery = $battery%"
+            )
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic
+        ) {
+            Log.d(
+                "BLE_NOTIFY",
+                "NOTIFY ${characteristic.uuid}"
+            )
+
+            characteristic.value?.let { value ->
+                Log.d(
+                    "BLE_NOTIFY",
+                    value.joinToString(" ") {
+                        "%02X".format(it)
+                    }
+                )
+            }
+        }
+
+        override fun onDescriptorWrite(
+            gatt: BluetoothGatt,
+            descriptor: BluetoothGattDescriptor,
+            status: Int
+        ) {
+            Log.d(
+                "BLE_NOTIFY",
+                "Descriptor Write status=$status"
             )
         }
     }

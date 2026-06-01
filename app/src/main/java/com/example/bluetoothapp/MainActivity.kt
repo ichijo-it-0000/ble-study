@@ -131,7 +131,10 @@ class MainActivity : ComponentActivity() {
             if (showServiceSheet.value) {
                 ServiceBottomSheet(
                     services = serviceList,
-                    onDismiss = { showServiceSheet.value = false }
+                    onDismiss = { showServiceSheet.value = false },
+                    onNotifyRequest = { characteristicInfo ->
+                        bleManager.enableNotify(characteristicInfo.characteristic)
+                    }
                 )
             }
         }

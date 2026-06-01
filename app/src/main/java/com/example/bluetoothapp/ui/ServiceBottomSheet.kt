@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
 
 import com.example.bluetoothapp.ble.ServiceInfo
+import com.example.bluetoothapp.ble.CharacteristicInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServiceBottomSheet(
     services: List<ServiceInfo>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onNotifyRequest: (CharacteristicInfo) -> Unit
 ) {
     var selectedItem by remember { mutableStateOf<String?>(null) }
 
@@ -41,7 +43,8 @@ fun ServiceBottomSheet(
                             CharacteristicsUI(
                                 characteristic = characteristic,
                                 selectedItem = selectedItem,
-                                onSelectedChange = { selectedItem = it }
+                                onSelectedChange = { selectedItem = it },
+                                onNotifyRequest = onNotifyRequest
                             )
                         }
                     }

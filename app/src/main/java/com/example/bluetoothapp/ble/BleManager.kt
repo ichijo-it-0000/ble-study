@@ -58,6 +58,11 @@ class BleManager(
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun enableNotify(characteristic: BluetoothGattCharacteristic) {
+        connector.enableNotify(characteristic)
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(device: BleDevice) {
         currentDeviceAddress = device.address
         Log.i("BleManager", "CONNECT START : ${device.address}")
@@ -100,7 +105,8 @@ class BleManager(
                     CharacteristicInfo(
                         name = charaName,
                         uuid = charaFullUuid,
-                        properties = getPropertyNames(characteristic.properties)
+                        properties = getPropertyNames(characteristic.properties),
+                        characteristic = characteristic
                     )
                 )
 

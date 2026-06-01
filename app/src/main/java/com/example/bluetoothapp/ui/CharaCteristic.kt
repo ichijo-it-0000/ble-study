@@ -21,7 +21,8 @@ import com.example.bluetoothapp.ble.CharacteristicInfo
 fun CharacteristicsUI(
     characteristic: CharacteristicInfo,
     selectedItem: String?,
-    onSelectedChange: (String?) -> Unit
+    onSelectedChange: (String?) -> Unit,
+    onNotifyRequest: (CharacteristicInfo) -> Unit
 ) {
     val isSelected = selectedItem == characteristic.uuid
 
@@ -39,6 +40,7 @@ fun CharacteristicsUI(
             )
             .clickable {
                 onSelectedChange(if (isSelected) null else characteristic.uuid)
+                onNotifyRequest(characteristic)
             }
     ) {
         Row(
