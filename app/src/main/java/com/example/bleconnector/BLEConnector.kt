@@ -20,10 +20,12 @@ import android.Manifest
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
@@ -33,6 +35,23 @@ class BLEConnector(
     private val deviceManager: DeviceManager
 ) {
     private var bluetoothGatt: BluetoothGatt? = null
+
+    private companion object {
+        const val TAG = "BLE"
+        // CCCD(Client Characteristic Configuration Descriptor)
+        //   - UUID = 0x2902
+        //   - Notify/Indicateの有効・無効を切り替えるDescriptor
+        const val CCCD_UUID = "00002902-0000-1000-8000-00805f9b34fb"
+    }
+
+     // Descriptor書き込み要求
+     // Android BLEはGATT Operationを並列実行できない。
+     // writeDescriptor()完了を待って次を送る必要があるため、Queueで管理する。
+    private class DescriptorWriteRequest(
+        val descriptor: BluetoothGattDescriptor,
+        val value: ByteArray
+    )
+    private val pendingDescriptorWrites = ArrayDeque<DescriptorWriteRequest>()
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(device: BLEDevice) {
@@ -88,8 +107,6 @@ class BLEConnector(
                     }
                 }
 
-
-
                 override fun onServicesDiscovered(
                     gatt: BluetoothGatt,
                     status: Int
@@ -118,6 +135,41 @@ class BLEConnector(
                     )
 
                     deviceManager.upsert(updated)
+
+                    // Permission check.
+                    if (
+                        ActivityCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        return
+                    }
+                    enableNotify(gatt)
+                }
+
+                private fun handleNotify(uuid: String, value: ByteArray?) {
+                    Log.d(TAG, "Notify uuid=$uuid value=${value?.joinToString()}")
+                }
+                // コールバック：リモートデバイスからCharacteristic通知を受信したときに呼ばれる。
+                // https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback?_gl=1*1pt425o*_up*MQ..*_ga*NzA3NzMxMDYyLjE3ODAzNzQxMTI.*_ga_6HH9YJMN9M*czE3ODAzNzQxMTEkbzEkZzAkdDE3ODAzNzQxMTEkajYwJGwwJGg4MjM1MTY2Nzg.#onCharacteristicChanged(android.bluetooth.BluetoothGatt,%20android.bluetooth.BluetoothGattCharacteristic,%20byte[])
+                // APIレベル32以下
+                @Deprecated("Deprecated in Java")
+                @Suppress("DEPRECATION")
+                override fun onCharacteristicChanged(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic
+                ) {
+                    handleNotify(characteristic.uuid.toString(), characteristic.value)
+                }
+
+                // APIレベル33以上
+                override fun onCharacteristicChanged(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    value: ByteArray
+                ) {
+                    handleNotify(characteristic.uuid.toString(), value)
                 }
             }
         )
@@ -135,20 +187,82 @@ class BLEConnector(
         bluetoothGatt = null
     }
 
-    // GATT hierarchy
-    // └ Service
-    //   └ Characteristic
-    //     └ Descriptor
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun enableNotify(gatt: BluetoothGatt) {
+        pendingDescriptorWrites.clear()
+        // BLEデバイスのGATTからNotify対応の通信チャネルだけ抜き出す
+        val notifyCharacteristics = gatt.services
+            .flatMap { it.characteristics }
+            .filter { it.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 }
+        Log.d(
+            TAG,
+            "Notify characteristic count=${notifyCharacteristics.size}"
+        )
+        notifyCharacteristics.forEach { characteristic ->
+            Log.d(
+                TAG,
+                "Notify characteristic=${characteristic.uuid}"
+            )
+            // 特定のcharacteristicに対してNotifyやIndicateを有効/無効にする。
+            // https://developer.android.com/develop/connectivity/bluetooth/ble/transfer-ble-data?hl=ja#notification
+            // https://developer.android.com/reference/android/bluetooth/BluetoothGatt?_gl=1*1lcs5j6*_up*MQ..*_ga*NzY2NTk0NzU2LjE3ODAzNzM2OTU.*_ga_6HH9YJMN9M*czE3ODAzNzM2OTQkbzEkZzAkdDE3ODAzNzM2OTQkajYwJGwwJGgxNDc1OTEwNTI5#setCharacteristicNotification(android.bluetooth.BluetoothGattCharacteristic,%20boolean)
+            gatt.setCharacteristicNotification(
+                characteristic,
+                true    // 今回は有効化
+            )
+            // Characteristic配下のCCCD検索
+            val cccd = characteristic.descriptors.firstOrNull {
+                it.uuid.toString().equals(
+                    CCCD_UUID,
+                    ignoreCase = true
+                )
+            }
+            if (cccd == null) {
+                Log.w(
+                    TAG,
+                    "CCCD not found: ${characteristic.uuid}"
+                )
+                return@forEach
+            }
 
-    // 1. Service 探索 (discoverServices(), onServicesDiscovered())
+            pendingDescriptorWrites.addLast(
+                DescriptorWriteRequest(
+                    descriptor = cccd,
+                    // https://developer.android.com/reference/android/bluetooth/BluetoothGattDescriptor#ENABLE_NOTIFICATION_VALUE
+                    value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                )
+            )
+        }
+        // Android BLEはGATT Operationを並列実行できないため、書き込み完了を待って次を送る。
+        writeNextDescriptor(gatt)
+    }
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun writeNextDescriptor(gatt: BluetoothGatt) {
+        val request =
+            pendingDescriptorWrites.removeFirstOrNull()
+                ?: return
+        Log.d(
+            TAG,
+            "Write CCCD=${request.descriptor.uuid}"
+        )
 
-    // 2. Characteristic 探索 ()
+        // 指定されたDescriptorの値を関連するリモートデバイスに書き込む。
+        // https://developer.android.com/reference/android/bluetooth/BluetoothGatt?_gl=1*romksb*_up*MQ..*_ga*NzA3NzMxMDYyLjE3ODAzNzQxMTI.*_ga_6HH9YJMN9M*czE3ODAzNzQxMTEkbzEkZzAkdDE3ODAzNzQxMTEkajYwJGwwJGg4MjM1MTY2Nzg.#writeDescriptor(android.bluetooth.BluetoothGattDescriptor)
+        // Android 13(API33)以降
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeDescriptor(
+                request.descriptor,
+                request.value
+            )
+        // Android 12以前
+        } else {
+            @Suppress("DEPRECATION")
+            request.descriptor.value = request.value
 
-    // 3. UUID 取得
-    // UUIDはServiceごと、Characteristicごと、Descriptorごと、、、に割り当てられている。
-    // どのように取得するのがいいのか。。。？
-    // 確認が必要。
-
-
-
+            @Suppress("DEPRECATION")
+            gatt.writeDescriptor(
+                request.descriptor
+            )
+        }
+    }
 }
