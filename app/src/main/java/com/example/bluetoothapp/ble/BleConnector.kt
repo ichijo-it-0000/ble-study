@@ -22,6 +22,8 @@ class BleConnector(
     private var gatt: BluetoothGatt? = null
     private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
+    private val BATTERY_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(device: BluetoothDevice) {
         gatt = device.connectGatt(context, false, gattCallback)
@@ -156,7 +158,15 @@ class BleConnector(
                         "%02X".format(it)
                     }
                 )
+                if (characteristic.uuid.toString().equals(BATTERY_UUID, ignoreCase = true)) {
+                    BatteryMonitor.update(value)
+                }
             }
+
+            NotifyLogManager.addLog(
+                uuid = characteristic.uuid.toString(),
+                value = characteristic.value
+            )
         }
 
         override fun onDescriptorWrite(

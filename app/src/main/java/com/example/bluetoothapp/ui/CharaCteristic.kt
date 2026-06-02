@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import com.example.bluetoothapp.ble.CharacteristicInfo
+import com.example.bluetoothapp.ble.BatteryMonitor
 
 @Composable
 fun CharacteristicsUI(
@@ -63,5 +64,13 @@ fun CharacteristicsUI(
         }
         Text(text = "│   ├─ UUID : ${characteristic.uuid}")
         Text(text = "│   └─ Property : ${characteristic.properties}")
+        if (characteristic.name == "Battery Level") {
+            val batteryLevel = BatteryMonitor.level
+            Text(
+                text = batteryLevel?.let {
+                    "│   └─ Battery Percentage : $it % (hex : ${"%02X".format(it)})"
+                } ?: "│   └─ Battery Percentage : ---"
+            )
+        }
     }
 }

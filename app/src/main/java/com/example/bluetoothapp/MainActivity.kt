@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.remember
 import com.example.bluetoothapp.ble.ServiceInfo
+import com.example.bluetoothapp.ui.NotifyLogBottomSheet
 import com.example.bluetoothapp.ui.ServiceBottomSheet
 enum class SortType {
     LAST_SEEN,
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var composeView: ComposeView
     private val visibleDevices = mutableStateListOf<BleDevice>()
     private val showServiceSheet = mutableStateOf(false)
+    private val showLogSheet = mutableStateOf(false)
     private val selectedDevice = mutableStateOf<BleDevice?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,7 +128,8 @@ class MainActivity : ComponentActivity() {
                     serviceList.addAll( bleManager.getDiscoveredServices())
                     selectedDevice.value = device
                     showServiceSheet.value = true
-                }
+                },
+                onShowLogs = { showLogSheet.value = true }
             )
             if (showServiceSheet.value) {
                 ServiceBottomSheet(
@@ -136,6 +139,9 @@ class MainActivity : ComponentActivity() {
                         bleManager.enableNotify(characteristicInfo.characteristic)
                     }
                 )
+            }
+            if (showLogSheet.value) {
+                NotifyLogBottomSheet(onDismiss = { showLogSheet.value = false })
             }
         }
     }
