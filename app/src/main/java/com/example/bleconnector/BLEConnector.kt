@@ -32,7 +32,8 @@ import androidx.core.app.ActivityCompat
 
 class BLEConnector(
     private val context: Context,
-    private val deviceManager: DeviceManager
+    private val deviceManager: DeviceManager,
+    private val notifyStore: NotifyStore
 ) {
     private var bluetoothGatt: BluetoothGatt? = null
 
@@ -161,6 +162,11 @@ class BLEConnector(
                     characteristic: BluetoothGattCharacteristic
                 ) {
                     handleNotify(characteristic.uuid.toString(), characteristic.value)
+                    notifyStore.add(
+                        serviceUuid = characteristic.service.uuid.toString(),
+                        charUuid = characteristic.uuid.toString(),
+                        value = characteristic.value
+                    )
                 }
 
                 // APIレベル33以上
@@ -170,6 +176,11 @@ class BLEConnector(
                     value: ByteArray
                 ) {
                     handleNotify(characteristic.uuid.toString(), value)
+                    notifyStore.add(
+                        serviceUuid = characteristic.service.uuid.toString(),
+                        charUuid = characteristic.uuid.toString(),
+                        value = value
+                    )
                 }
             }
         )

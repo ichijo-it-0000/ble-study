@@ -19,11 +19,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,6 +40,7 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import com.example.bleconnector.BLEConnector
 import com.example.bleconnector.DeviceManager
+import com.example.bleconnector.NotifyStore
 import com.example.bleconnector.resolveUuid
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,7 +50,8 @@ fun BLEDeviceDetailScreen(
     address: String,
     deviceManager: DeviceManager,
     navController: NavController,
-    connector: BLEConnector
+    connector: BLEConnector,
+    notifyStore: NotifyStore
 ) {
     val device = deviceManager.devices
         .find { it.address == address }
@@ -53,6 +59,8 @@ fun BLEDeviceDetailScreen(
     var selectedUuid by remember {
         mutableStateOf<String?>(null)
     }
+
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -79,99 +87,189 @@ fun BLEDeviceDetailScreen(
             Spacer(
                 modifier = Modifier.height(12.dp)
             )
-            LazyColumn(
-                modifier = Modifier.weight(1f)
-            ) {
-                items(
-                    items = device?.services ?: emptyList(),
-                    key = { it.uuid }
-                ) { service ->
-                    val serviceInfo = resolveUuid(service.uuid)
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+
+            PrimaryTabRow( selectedTabIndex = selectedTab ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 }
+                ) {
+                    Text("GATT")
+                }
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 }
+                ) {
+                    Text("Data")
+                }
+            }
+
+            Spacer(
+                modifier = Modifier.height(12.dp)
+            )
+
+            when(selectedTab) {
+                0 -> {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                text = "[S] ${serviceInfo.name}",
-                                fontWeight = FontWeight.Bold
-                            )
-                            CopyableUuidText(
-                                uuid = service.uuid,
-                                selected = selectedUuid == service.uuid,
-                                onClick = {
-                                    selectedUuid = service.uuid
-                                }
-                            )
-
-                            Spacer(
-                                modifier = Modifier.height(8.dp)
-                            )
-
-                            service.characteristics.forEachIndexed { index, ch ->
-                                val chInfo = resolveUuid(ch.uuid)
-                                val isLastCharacteristic =
-                                    index == service.characteristics.lastIndex
-                                val branch =
-                                    if (isLastCharacteristic) "└─"
-                                    else "├─"
-
+                        items(
+                            items = device?.services ?: emptyList(),
+                            key = { it.uuid }
+                        ) { service ->
+                            val serviceInfo = resolveUuid(service.uuid)
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
                                 Column(
-                                    modifier = Modifier.padding(start = 16.dp)
+                                    modifier = Modifier.padding(12.dp)
                                 ) {
+                                    Text(
+                                        text = "[S] ${serviceInfo.name}",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    CopyableUuidText(
+                                        uuid = service.uuid,
+                                        selected = selectedUuid == service.uuid,
+                                        onClick = {
+                                            selectedUuid = service.uuid
+                                        }
+                                    )
 
-                                    Text("$branch [C] ${chInfo.name}")
+                                    Spacer(
+                                        modifier = Modifier.height(8.dp)
+                                    )
 
-                                    Column(
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    ) {
-                                        CopyableUuidText(
-                                            uuid = ch.uuid,
-                                            selected = selectedUuid == ch.uuid,
-                                            onClick = {
-                                                selectedUuid = ch.uuid
-                                            }
-                                        )
-                                        Text(
-                                            "Properties: ${ch.properties}"
-                                        )
-                                    }
-
-                                    ch.descriptors.forEachIndexed { descIndex, desc ->
-                                        val descInfo =
-                                            resolveUuid(desc)
-                                        val isLastDescriptor =
-                                            descIndex == ch.descriptors.lastIndex
-                                        val descBranch =
-                                            if (isLastDescriptor) "└─"
+                                    service.characteristics.forEachIndexed { index, ch ->
+                                        val chInfo = resolveUuid(ch.uuid)
+                                        val isLastCharacteristic =
+                                            index == service.characteristics.lastIndex
+                                        val branch =
+                                            if (isLastCharacteristic) "└─"
                                             else "├─"
+
                                         Column(
                                             modifier = Modifier.padding(start = 16.dp)
                                         ) {
-                                            Text(
-                                                "$descBranch [D] ${descInfo.name}"
-                                            )
+
+                                            Text("$branch [C] ${chInfo.name}")
+
                                             Column(
                                                 modifier = Modifier.padding(start = 16.dp)
                                             ) {
                                                 CopyableUuidText(
-                                                    uuid = desc,
-                                                    selected = selectedUuid == desc,
+                                                    uuid = ch.uuid,
+                                                    selected = selectedUuid == ch.uuid,
                                                     onClick = {
-                                                        selectedUuid = desc
+                                                        selectedUuid = ch.uuid
                                                     }
                                                 )
+                                                Text(
+                                                    "Properties: ${ch.properties}"
+                                                )
+                                            }
+
+                                            ch.descriptors.forEachIndexed { descIndex, desc ->
+                                                val descInfo =
+                                                    resolveUuid(desc)
+                                                val isLastDescriptor =
+                                                    descIndex == ch.descriptors.lastIndex
+                                                val descBranch =
+                                                    if (isLastDescriptor) "└─"
+                                                    else "├─"
+                                                Column(
+                                                    modifier = Modifier.padding(start = 16.dp)
+                                                ) {
+                                                    Text(
+                                                        "$descBranch [D] ${descInfo.name}"
+                                                    )
+                                                    Column(
+                                                        modifier = Modifier.padding(start = 16.dp)
+                                                    ) {
+                                                        CopyableUuidText(
+                                                            uuid = desc,
+                                                            selected = selectedUuid == desc,
+                                                            onClick = {
+                                                                selectedUuid = desc
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(
+                                            modifier = Modifier.height(8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                1 -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        Text("Notify Data")
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Latest Value",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                val latest by notifyStore.latest
+                                Text(
+                                    text = latest?.let { data ->
+                                        val (service, char, value) = data
+                                        val rawValue = value.joinToString()
+                                        val hexValue = notifyStore.toHex(value)
+                                        """
+                                            Service: $service
+                                            Characteristic: $char
+                                            Value (Raw): $rawValue
+                                            Value (Hex): $hexValue
+                                        """.trimIndent()
+                                    } ?: "No Data"
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Log",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                LazyColumn {
+                                    items(notifyStore.history.reversed()) { item ->
+                                        val (service, char, value) = item
+                                        val rawValue = value.joinToString()
+                                        val hexValue = notifyStore.toHex(value)
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            Column(Modifier.padding(8.dp)) {
+                                                Text("Service: $service")
+                                                Text("Char: $char")
+                                                Text("Value (Raw): $rawValue")
+                                                Text("Value (Hex): $hexValue")
                                             }
                                         }
                                     }
                                 }
-
-                                Spacer(
-                                    modifier = Modifier.height(8.dp)
-                                )
                             }
                         }
                     }
