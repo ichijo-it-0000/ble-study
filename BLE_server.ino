@@ -14,19 +14,29 @@
 #include <BLE2902.h>
 #include <BLEBeacon.h>
 
+#include <M5Stack.h>
+
 // UUIDには決まっているもの(意味が標準で定められているもの)があるらしい。
 // 例えば、Device名は0x2A00など
 // * https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Assigned_Numbers/out/en/Assigned_Numbers.pdf
 
-#define DEVICE_NAME            "ESP32"
+#define DEVICE_NAME            "M5Stack"
 #define SERVICE_UUID           "3623fd47-f9b8-4504-a7ce-3e598382257b"
-#define CHARACTERISTIC_UUID    "6679c3f5-301c-434b-bdbe-eac49e25adf9"
+#define NOTIFY_CHARACTERISTIC_UUID    "6679c3f5-301c-434b-bdbe-eac49e25adf9"
+#define WRITE_CHARACTERISTIC_UUID   "e62715f9-e942-4266-2cb9-50f2b6f8cd0a"
 
 BLEServer *pServer;
-BLECharacteristic *pCharacteristic;
+BLECharacteristic *pNotifyCharacteristic;
+BLECharacteristic *pWriteCharacteristic;
 bool deviceConnected = false;
 uint8_t value = 0;
 
+void sendAck(const String& msg) {
+  if (!deviceConnected) return;
+
+  pNotifyCharacteristic->setValue(msg.c_str());
+  pNotifyCharacteristic->notify();
+}
 
 // Callbacks associated with the operation of a BLE server.
 // * https://lang-ship.com/reference/unofficial/M5StickC/Class/ESP32/BLEServerCallbacks/
@@ -71,6 +81,30 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     }
 };
 
+class WriteCallbacks: public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *pCharacteristic) override {
+    std::string rxValue = pCharacteristic->getValue();
+
+    String cmd = String(rxValue.c_str());
+
+    Serial.println("=== WRITE RECEIVED ===");
+    Serial.println(cmd);
+    if (cmd == "RED") {
+      Serial.println("STATE: RED MODE");
+      M5.Lcd.fillScreen(RED);
+
+      sendAck("OK:RED");
+
+    } else if (cmd == "BLACK") {
+      Serial.println("STATE: NORMAL MODE");
+      M5.Lcd.fillScreen(BLACK);
+      sendAck("OK:BLACK");
+    } else {
+      Serial.println("STATE: UNKNOWN");
+      sendAck("ERR:UNKNOWN_CMD");
+    }
+  }
+};
 
 void init_service() {
   // BLEServerが持っているAdvertisingを取得。
@@ -98,20 +132,29 @@ void init_service() {
 
   // Create a BLE Characteristic
   // READ / WRITE / NOTIFY がすべて有効なCharacteristicを作る
-  pCharacteristic = pService->createCharacteristic(
-                      CHARACTERISTIC_UUID,
+  pNotifyCharacteristic = pService->createCharacteristic(
+                      NOTIFY_CHARACTERISTIC_UUID,
                       BLECharacteristic::PROPERTY_READ   |
                       BLECharacteristic::PROPERTY_WRITE  |
                       BLECharacteristic::PROPERTY_NOTIFY
                     );
   
-  pCharacteristic->setCallbacks(new MyCallbacks());
+  pNotifyCharacteristic->setCallbacks(new MyCallbacks());
+
+  pWriteCharacteristic = pService->createCharacteristic(
+                      WRITE_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ   |
+                      BLECharacteristic::PROPERTY_WRITE  |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );
+
+  pWriteCharacteristic->setCallbacks(new WriteCallbacks());
 
   // 0x2902: Client Characteristic Configuration Descriptor
   // このCharacteristicの通知を受け取るかどうかをクライアントが制御するスイッチ
   // * https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/Assigned_Numbers/out/en/Assigned_Numbers.pdf
-  pCharacteristic->addDescriptor(new BLE2902());
-
+  pNotifyCharacteristic->addDescriptor(new BLE2902());
+  pWriteCharacteristic->addDescriptor(new BLE2902());
   // Advertisingに Service UUID を含める
   pAdvertising->addServiceUUID(BLEUUID(SERVICE_UUID));
 
@@ -154,6 +197,8 @@ void setup() {
   pServer = BLEDevice::createServer();  // Create a new instance of a GATT server.
   pServer->setCallbacks(new MyServerCallbacks()); // Callback登録。
 
+  M5.begin();
+
   init_service(); // Service初期化。
 
   Serial.println("Service defined and advertising!");
@@ -162,8 +207,8 @@ void setup() {
 void loop() {
   if (deviceConnected) {
     Serial.printf("*** NOTIFY: %d ***\n", value);
-    pCharacteristic->setValue(&value, 1);
-    pCharacteristic->notify();
+    pNotifyCharacteristic->setValue(&value, 1);
+    pNotifyCharacteristic->notify();
     value++;
   }
   delay(2000);
