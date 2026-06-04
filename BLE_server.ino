@@ -209,6 +209,7 @@ void loop() {
     Serial.printf("*** NOTIFY: %d ***\n", value);
     pNotifyCharacteristic->setValue(&value, 1);
     pNotifyCharacteristic->notify();
+    pWriteCharacteristic->notify();
     value++;
   }
   delay(2000);
