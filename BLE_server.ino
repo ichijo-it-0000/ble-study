@@ -31,11 +31,11 @@ BLECharacteristic *pWriteCharacteristic;
 bool deviceConnected = false;
 uint8_t value = 0;
 
-void sendAck(const String& msg) {
+void sendAck(BLECharacteristic* characteristic,const String& msg) {
   if (!deviceConnected) return;
 
-  pNotifyCharacteristic->setValue(msg.c_str());
-  pNotifyCharacteristic->notify();
+    characteristic->setValue(msg.c_str());
+    characteristic->notify();
 }
 
 // Callbacks associated with the operation of a BLE server.
@@ -93,15 +93,15 @@ class WriteCallbacks: public BLECharacteristicCallbacks {
       Serial.println("STATE: RED MODE");
       M5.Lcd.fillScreen(RED);
 
-      sendAck("OK:RED");
+      sendAck(pCharacteristic, "OK:RED");
 
     } else if (cmd == "BLACK") {
       Serial.println("STATE: NORMAL MODE");
       M5.Lcd.fillScreen(BLACK);
-      sendAck("OK:BLACK");
+      sendAck(pCharacteristic, "OK:BLACK");
     } else {
       Serial.println("STATE: UNKNOWN");
-      sendAck("ERR:UNKNOWN_CMD");
+      sendAck(pCharacteristic, "ERR:UNKNOWN_CMD");
     }
   }
 };
