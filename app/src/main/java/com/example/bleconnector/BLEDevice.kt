@@ -15,6 +15,6 @@ data class BLEServiceInfo(
 
 data class BLECharacteristicInfo(
     val uuid: String,
-    val properties: String,
+    val properties: Int,
     val descriptors: List<String>
 )

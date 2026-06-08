@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var bleConnector: BLEConnector
     private val deviceManager = DeviceManager()
     private val notifyStore = NotifyStore()
+    private val writeStore = WriteStore()
 
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,7 +77,8 @@ class MainActivity : ComponentActivity() {
         bleConnector = BLEConnector(
             context = this,
             deviceManager = deviceManager,
-            notifyStore = notifyStore
+            notifyStore = notifyStore,
+            writeStore = writeStore
         )
 
         // ここでCompose UIを開始して画面を構成する。
@@ -102,7 +104,8 @@ class MainActivity : ComponentActivity() {
                         deviceManager = deviceManager,
                         connector = bleConnector,
                         navController = navController,
-                        notifyStore = notifyStore
+                        notifyStore = notifyStore,
+                        writeStore = writeStore
                     )
                 }
             }

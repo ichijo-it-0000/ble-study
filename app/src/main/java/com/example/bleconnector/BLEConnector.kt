@@ -33,7 +33,8 @@ import androidx.core.app.ActivityCompat
 class BLEConnector(
     private val context: Context,
     private val deviceManager: DeviceManager,
-    private val notifyStore: NotifyStore
+    private val notifyStore: NotifyStore,
+    private val writeStore: WriteStore
 ) {
     private var bluetoothGatt: BluetoothGatt? = null
 
@@ -108,6 +109,19 @@ class BLEConnector(
                     }
                 }
 
+                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                override fun onDescriptorWrite(
+                    gatt: BluetoothGatt,
+                    descriptor: BluetoothGattDescriptor,
+                    status: Int
+                ) {
+                    Log.d(
+                        "BLE_DEBUG",
+                        "CCCD DONE uuid=${descriptor.characteristic.uuid} status=$status"
+                    )
+                    writeNextDescriptor(gatt)
+                }
+
                 override fun onServicesDiscovered(
                     gatt: BluetoothGatt,
                     status: Int
@@ -119,11 +133,7 @@ class BLEConnector(
                             characteristics = service.characteristics.map { ch ->
                                 BLECharacteristicInfo(
                                     uuid = ch.uuid.toString(),
-                                    properties = buildString {
-                                        append("R=${ch.properties and BluetoothGattCharacteristic.PROPERTY_READ != 0}, ")
-                                        append("W=${ch.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0}, ")
-                                        append("N=${ch.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0}")
-                                    },
+                                    properties = ch.properties,
                                     descriptors = ch.descriptors.map { it.uuid.toString() }
                                 )
                             }
@@ -162,6 +172,7 @@ class BLEConnector(
                     characteristic: BluetoothGattCharacteristic
                 ) {
                     handleNotify(characteristic.uuid.toString(), characteristic.value)
+                    Log.d("BLE", "RECEIVED uuid=${characteristic.uuid} value=${characteristic.value.joinToString()}")
                     notifyStore.add(
                         serviceUuid = characteristic.service.uuid.toString(),
                         charUuid = characteristic.uuid.toString(),
@@ -182,6 +193,28 @@ class BLEConnector(
                         value = value
                     )
                 }
+
+                override fun onCharacteristicWrite(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    status: Int
+                ) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d("BLE", "WRITE SUCCESS: ${characteristic.uuid}")
+                        writeStore.success(
+                            charUuid = characteristic.uuid.toString(),
+                            input = "WRITE",
+                            code = status
+                        )
+                    } else {
+                        Log.e("BLE", "WRITE FAILED: ${characteristic.uuid} status=$status")
+                        writeStore.failed(
+                            charUuid = characteristic.uuid.toString(),
+                            input = "WRITE",
+                            code = status
+                        )
+                    }
+                }
             }
         )
     }
@@ -196,6 +229,53 @@ class BLEConnector(
 
         bluetoothGatt?.close()
         bluetoothGatt = null
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun sendCommand(
+        command: BLECommand,
+        serviceUuid: String,
+        characteristicUuid: String
+    ) {
+        writeCharacteristic(
+            serviceUuid,
+            characteristicUuid,
+            byteArrayOf(command.code)
+        )
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun writeCharacteristic(
+        serviceUuid: String,
+        characteristicUuid: String,
+        value: ByteArray
+    ) {
+        val gatt = bluetoothGatt ?: return
+
+        val service = gatt.services.firstOrNull {
+            it.uuid.toString() == serviceUuid
+        } ?: return
+
+        val characteristic = service.characteristics.firstOrNull {
+            it.uuid.toString() == characteristicUuid
+        } ?: return
+
+        // Android13(API33)以降
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeCharacteristic(
+                characteristic,
+                value,
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            )
+        }
+        else {
+            @Suppress("DEPRECATION")
+            characteristic.value = value
+            @Suppress("DEPRECATION")
+            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            @Suppress("DEPRECATION")
+            gatt.writeCharacteristic(characteristic)
+        }
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
