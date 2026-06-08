@@ -18,11 +18,23 @@ import androidx.compose.ui.text.AnnotatedString
 import com.example.bluetoothapp.ble.CharacteristicInfo
 import com.example.bluetoothapp.ble.BatteryMonitor
 
+import android.bluetooth.BluetoothGattCharacteristic
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.unit.dp
+import com.example.bluetoothapp.ble.BleLogManager
+import com.example.bluetoothapp.ble.LogType
+
 @Composable
 fun CharacteristicsUI(
     characteristic: CharacteristicInfo,
     selectedItem: String?,
     onSelectedChange: (String?) -> Unit,
+    onReadRequest: (CharacteristicInfo) -> Unit,
+    onWriteRequest: (CharacteristicInfo, String) -> Unit,
     onNotifyRequest: (CharacteristicInfo) -> Unit
 ) {
     val isSelected = selectedItem == characteristic.uuid
@@ -63,7 +75,49 @@ fun CharacteristicsUI(
             }
         }
         Text(text = "│   ├─ UUID : ${characteristic.uuid}")
-        Text(text = "│   └─ Property : ${characteristic.properties}")
+    val canRead = characteristic.characteristic.properties and BluetoothGattCharacteristic.PROPERTY_READ != 0
+    val canWrite = characteristic.characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0
+    val canNotify = characteristic.characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
+
+    var writeText by remember { mutableStateOf("") }
+
+    Text(text = "│   └─ Property : ${listOfNotNull(
+        if (canRead) "READ" else null,
+        if (canWrite) "WRITE" else null,
+        if (canNotify) "NOTIFY" else null
+    ).joinToString(" | ")}")
+
+    Row(modifier = Modifier.padding(vertical = 4.dp)) {
+        if (canRead) {
+            Button(onClick = { onReadRequest(characteristic) }) {
+                Text("READ")
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        if (canWrite) {
+            Button(
+                onClick = { onWriteRequest(characteristic, writeText) },
+                enabled = writeText.isNotEmpty()
+            ) { Text("WRITE") }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        if (canNotify) {
+            Button(onClick = { onNotifyRequest(characteristic) }) {
+                Text("NOTIFY")
+            }
+        }
+    }
+
+    if (canWrite) {
+        OutlinedTextField(
+            value = writeText,
+            onValueChange = { writeText = it },
+            label = { Text("Write text") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+        )
+    }
         if (characteristic.name == "Battery Level") {
             val batteryLevel = BatteryMonitor.level
             Text(

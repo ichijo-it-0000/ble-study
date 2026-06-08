@@ -11,7 +11,7 @@ data class ServiceInfo(
 data class CharacteristicInfo(
     val name: String,
     val uuid: String,
-    val properties: String,
+    val properties: Int,
     val characteristic: BluetoothGattCharacteristic
 )
 

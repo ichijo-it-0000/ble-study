@@ -34,21 +34,36 @@ object BatteryMonitor {
     }
 }
 
-data class NotifyLog(
+enum class LogType {
+    READ,
+    WRITE,
+    NOTIFY
+}
+
+data class BleLog(
     val timestamp: String,
     val uuid: String,
-    val valueHex: String
+    val type: LogType,
+    val value: ByteArray
 )
 
-object NotifyLogManager {
-    val logs = mutableStateListOf<NotifyLog>()
+object BleLogManager {
+    val logs = mutableStateListOf<BleLog>()
 
-    fun addLog(uuid: String, value: ByteArray) {
+    fun add(
+        type: LogType,
+        uuid: String,
+        value: ByteArray
+    ) {
         logs.add(
-            NotifyLog(
-                timestamp = SimpleDateFormat("HH:mm:ss", Locale.JAPAN).format(Date()),
+            BleLog(
+                timestamp = SimpleDateFormat(
+                    "HH:mm:ss",
+                    Locale.JAPAN
+                ).format(Date()),
                 uuid = uuid,
-                valueHex = value.joinToString(" ") { "%02X".format(it) }
+                type = type,
+                value = value.copyOf()
             )
         )
     }

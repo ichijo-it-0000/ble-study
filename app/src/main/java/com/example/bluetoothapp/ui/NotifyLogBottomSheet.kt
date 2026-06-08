@@ -15,7 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.bluetoothapp.ble.BleCharacteristicNames
-import com.example.bluetoothapp.ble.NotifyLogManager
+import com.example.bluetoothapp.ble.BleLogManager
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,7 +23,7 @@ import com.example.bluetoothapp.ble.NotifyLogManager
 fun NotifyLogBottomSheet(onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         LazyColumn {
-            items(NotifyLogManager.logs.reversed()) { log ->
+            items(BleLogManager.logs.reversed()) { log ->
 
                 val characteristicName = BleCharacteristicNames.getName(log.uuid)
 
@@ -40,7 +40,8 @@ fun NotifyLogBottomSheet(onDismiss: () -> Unit) {
                             thickness = 1.dp
                         )
                         Text(text = "Service Name :  $characteristicName")
-                        Text(text = "Received Data(HEX):  ${log.valueHex}")
+                        Text(text = "Received Data(HEX):  ${log.value.joinToString(" ") { "%02X".format(it) }}")
+                        Text(text = "Received Data(UTF-8):  ${String(log.value)}")
                     }
                 }
             }

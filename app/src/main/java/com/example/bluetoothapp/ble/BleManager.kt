@@ -83,6 +83,17 @@ class BleManager(
         onDevicesUpdated()
         connector.disconnect()
     }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun readCharacteristic(characteristic: BluetoothGattCharacteristic) {
+        connector.readCharacteristic(characteristic)
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun writeCharacteristic(characteristic: BluetoothGattCharacteristic, data: ByteArray) {
+        connector.writeCharacteristic(characteristic, data)
+    }
+
     private val BATTERY_LEVEL_UUID = java.util.UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb")
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun handleServicesDiscovered(services: List<BluetoothGattService>) {
@@ -105,7 +116,7 @@ class BleManager(
                     CharacteristicInfo(
                         name = charaName,
                         uuid = charaFullUuid,
-                        properties = getPropertyNames(characteristic.properties),
+                        properties = characteristic.properties,
                         characteristic = characteristic
                     )
                 )
@@ -128,24 +139,5 @@ class BleManager(
         registry.setConnectionState(it, ConnectionState.CONNECTED)
         onDevicesUpdated()
         }
-    }
-
-    private fun getPropertyNames(properties: Int): String {
-
-        val names = mutableListOf<String>()
-
-        if (properties and BluetoothGattCharacteristic.PROPERTY_READ != 0) {
-            names.add("READ")
-        }
-
-        if (properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) {
-            names.add("WRITE")
-        }
-
-        if (properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) {
-            names.add("NOTIFY")
-        }
-
-        return names.joinToString(" | ")
     }
 }

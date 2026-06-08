@@ -135,6 +135,15 @@ class MainActivity : ComponentActivity() {
                 ServiceBottomSheet(
                     services = serviceList,
                     onDismiss = { showServiceSheet.value = false },
+                    onReadRequest = { characteristicInfo ->
+                        bleManager.readCharacteristic(characteristicInfo.characteristic)
+                    },
+                    onWriteRequest = { characteristicInfo, payload ->
+                        bleManager.writeCharacteristic(
+                            characteristicInfo.characteristic,
+                            payload.toByteArray(Charsets.UTF_8)
+                        )
+                    },
                     onNotifyRequest = { characteristicInfo ->
                         bleManager.enableNotify(characteristicInfo.characteristic)
                     }
