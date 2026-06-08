@@ -23,7 +23,6 @@ BLE2902 *pBLE2902_write;
 
 bool deviceConnected = false;
 
-
 class MyServerCallbacks: public BLEServerCallbacks {
   //BLEサーバーのイベントコールバック
     void onConnect(BLEServer* pServer) {
@@ -44,35 +43,37 @@ class MyServerCallbacks: public BLEServerCallbacks {
 };
 
 
-void sendAck(BLECharacteristic* characteristic,const String& msg) {
-  if (!deviceConnected) return;
-  
-  characteristic->setValue(msg.c_str());
-  characteristic->notify();
-}
-
-
-class WriteCallbacks: public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic *pCharacteristic) override {
-    std::string rcv_data = pCharacteristic->getValue();
-    String value = String(rcv_data.c_str());
-
-    Serial.printf("Write Callback: data recieved. \n");
-    Serial.println(value);
-    
-    //セントラル側にデータを送信
-    sendAck(pCharacteristic, "Test");
-  }
-};
-
-
 class NotifyCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pCharacteristic) {
     // 引数のcharaに何かしらデータが書き込まれる。
     std::string wrote_data = pCharacteristic->getValue();
 
-    if (!wrote_data.empty()) {
-      M5.Lcd.printf("Received Value: %s .\n" ,wrote_data.c_str());
+    if (wrote_data.empty()) return;
+
+    M5.Lcd.printf("Write Callback: data recieved. \n");
+    M5.Lcd.printf("Received Value: %s.\n" ,wrote_data.c_str());
+
+    //セントラル側にデータを送信
+    if(wrote_data == "on" || wrote_data == "ON"){
+      pWriteCharacteristic->setValue("Device is ON.");
+      M5.Lcd.printf("Sending notify\n");
+      //ACKの通知
+      uint8_t ack = 0x01;
+      pCharacteristic->setValue(&ack, 1);
+      pCharacteristic->notify();
+    }
+    else if (wrote_data == "off" || wrote_data == "OFF") {
+      pWriteCharacteristic->setValue("Device is OFF.");
+
+      uint8_t ack = 0x01;
+      pNotifyCharacteristic->setValue(&ack, 1);
+      pNotifyCharacteristic->notify();
+    }
+    else{
+      pWriteCharacteristic->setValue("Plase send correct data.");
+      uint8_t ack = 0x00;
+      pCharacteristic->setValue(&ack, 1);
+      pCharacteristic->notify();
     }
   }
 };
@@ -91,18 +92,11 @@ BLEService* createService(BLEServer *pServer) {
   // Characteristicの生成
   pWriteCharacteristic = pService->createCharacteristic(
                       WRITE_CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_READ   |
-                      BLECharacteristic::PROPERTY_WRITE  |
-                      BLECharacteristic::PROPERTY_NOTIFY
+                      BLECharacteristic::PROPERTY_READ
                     );
-  pWriteCharacteristic->setCallbacks(new WriteCallbacks());
-  pBLE2902_write = new BLE2902();
-  pWriteCharacteristic->addDescriptor(pBLE2902_write);
-  pWriteCharacteristic->setValue("tmp test");
 
   pNotifyCharacteristic = pService->createCharacteristic(
                       NOTIFY_CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_READ   |
                       BLECharacteristic::PROPERTY_WRITE  |
                       BLECharacteristic::PROPERTY_NOTIFY
                     );
@@ -144,17 +138,5 @@ void setup() {
 }
 
 void loop() {
-  if (deviceConnected) {
-    if(pBLE2902_notify->getNotifications()){
-      M5.Lcd.printf("Notify: \n");
-      pNotifyCharacteristic->setValue("Notify");
-      pNotifyCharacteristic->notify();
-    }
-    if(pBLE2902_write->getNotifications()){
-      M5.Lcd.printf("Write: \n");
-      pNotifyCharacteristic->setValue("Write");
-      pWriteCharacteristic->notify();
-    }
-  }
-  delay(2000);
+  delay(100);
 }
