@@ -57,7 +57,7 @@ fun ServiceBottomSheet(
                         }
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    LogDisplayArea(selectedUuid = selectedItem)
+                    LogDisplayArea(characteristics = service.characteristics)
                 }
             }
         }
@@ -65,12 +65,10 @@ fun ServiceBottomSheet(
 }
 
 @Composable
-fun LogDisplayArea(selectedUuid: String?) {
-    val logs = if (selectedUuid != null) {
-        BleLogManager.logs.filter { it.uuid == selectedUuid }
-    } else {
-        BleLogManager.logs 
-    }
+fun LogDisplayArea(characteristics: List<CharacteristicInfo>) {
+    val characteristicUuids = characteristics.map { it.uuid }.toSet()
+    
+    val logs = BleLogManager.logs.filter { log -> characteristicUuids.contains(log.uuid) }
 
     Column(
         modifier = Modifier
@@ -79,7 +77,7 @@ fun LogDisplayArea(selectedUuid: String?) {
             .padding(12.dp)
     ) {
         Text(
-            text = "Data Log",
+            text = "Connection Logs",
             style = MaterialTheme.typography.titleSmall
         )
 

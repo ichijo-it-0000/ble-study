@@ -231,7 +231,7 @@ class BleConnector(
                 "BLE_WRITE",
                 "WRITE RESULT\n UUID : ${characteristic.uuid} \nSTATUS : $status\n".trimIndent()
             )
-                // WRITE 成功時のログ記録
+            
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 BleLogManager.add(
                     LogType.WRITE,
@@ -239,9 +239,6 @@ class BleConnector(
                     characteristic.value ?: ByteArray(0)
                 )
 
-                BleLogManager.add(LogType.WRITE, characteristic.uuid.toString(), characteristic.value ?: ByteArray(0))
-
-                // WRITE 後、自動的にそのキャラクタリスティックを READ
                 val writeCharacteristic = gatt.services
                     .flatMap { it.characteristics }
                     .find { it.uuid == WRITE_UUID }

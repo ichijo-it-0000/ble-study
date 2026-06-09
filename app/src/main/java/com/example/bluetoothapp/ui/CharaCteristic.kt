@@ -75,9 +75,9 @@ fun CharacteristicsUI(
             }
         }
         Text(text = "│   ├─ UUID : ${characteristic.uuid}")
-    val canRead = characteristic.characteristic.properties and BluetoothGattCharacteristic.PROPERTY_READ != 0
-    val canWrite = characteristic.characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0
-    val canNotify = characteristic.characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
+    val canRead = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_READ != 0
+    val canWrite = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0
+    val canNotify = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
 
     var writeText by remember { mutableStateOf("") }
 
@@ -112,7 +112,7 @@ fun CharacteristicsUI(
         OutlinedTextField(
             value = writeText,
             onValueChange = { writeText = it },
-            label = { Text("Write text") },
+            label = { Text("Write command") },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp)
