@@ -47,9 +47,9 @@ import com.example.bleconnector.BLECommand
 import com.example.bleconnector.BLEConnector
 import com.example.bleconnector.DeviceManager
 import com.example.bleconnector.NotifyStore
+import com.example.bleconnector.UuidRegistry
 import com.example.bleconnector.UuidType
 import com.example.bleconnector.WriteStore
-import com.example.bleconnector.resolveUuid
 
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.S)
@@ -130,7 +130,7 @@ fun BLEDeviceDetailScreen(
                             items = device?.services ?: emptyList(),
                             key = { it.uuid }
                         ) { service ->
-                            val serviceInfo = resolveUuid(service.uuid)
+                            val serviceInfo = UuidRegistry.resolve(service.uuid)
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -156,7 +156,7 @@ fun BLEDeviceDetailScreen(
                                     )
 
                                     service.characteristics.forEachIndexed { index, ch ->
-                                        val chInfo = resolveUuid(ch.uuid)
+                                        val chInfo = UuidRegistry.resolve(ch.uuid)
                                         val isLastCharacteristic =
                                             index == service.characteristics.lastIndex
                                         val branch =
@@ -189,7 +189,7 @@ fun BLEDeviceDetailScreen(
 
                                             ch.descriptors.forEachIndexed { descIndex, desc ->
                                                 val descInfo =
-                                                    resolveUuid(desc)
+                                                    UuidRegistry.resolve(desc)
                                                 val isLastDescriptor =
                                                     descIndex == ch.descriptors.lastIndex
                                                 val descBranch =
@@ -242,7 +242,7 @@ fun BLEDeviceDetailScreen(
                                         fontWeight = FontWeight.Bold
                                     )
 
-                                    val serviceInfo = resolveUuid(service.uuid)
+                                    val serviceInfo = UuidRegistry.resolve(service.uuid)
                                     Text(
                                         text = if (serviceInfo.type == UuidType.CUSTOM) {
                                             "Custom Service"
@@ -381,19 +381,24 @@ fun BLEDeviceDetailScreen(
                                                         val serviceUuid = service.uuid
                                                         val characteristicUuid = ch.uuid
                                                         val text = sendTextMap[ch.uuid] ?: ""
-                                                        val command = when (text.uppercase()) {
-                                                            "ON" -> BLECommand.ON
-                                                            "OFF" -> BLECommand.OFF
-                                                            else -> {
-                                                                writeStore.unknown(charUuid = characteristicUuid, input = text)
-                                                                return@Button
-                                                            }
+                                                        val (isCommand, command) = when (text.uppercase()) {
+                                                            "ON" -> true to BLECommand.ON
+                                                            "OFF" -> true to BLECommand.OFF
+                                                            else -> false to null
                                                         }
-                                                        command.let {
+                                                        if (isCommand && command != null) {
                                                             connector.sendCommand(
-                                                                it,
+                                                                command,
                                                                 serviceUuid,
                                                                 characteristicUuid
+                                                            )
+                                                        }
+                                                        // それ以外はそのまま送信
+                                                        else {
+                                                            connector.writeCharacteristic(
+                                                                serviceUuid = serviceUuid,
+                                                                characteristicUuid = characteristicUuid,
+                                                                value = text.toByteArray()
                                                             )
                                                         }
                                                     }) {
@@ -463,9 +468,11 @@ fun BLEDeviceDetailScreen(
                     context,
                     Manifest.permission.BLUETOOTH_CONNECT
                 ) == PackageManager.PERMISSION_GRANTED
-                if (granted) {
-                    connector.disconnect(context)
-                    navController.popBackStack()
+                device?.let {
+                    if (granted) {
+                        connector.disconnect(context, it.address)
+                        navController.popBackStack()
+                    }
                 }
             }) {
                 Text("Disconnect")

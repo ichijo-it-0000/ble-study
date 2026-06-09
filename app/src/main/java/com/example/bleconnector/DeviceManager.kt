@@ -1,4 +1,5 @@
 package com.example.bleconnector
+import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 
 // スキャン時のFilterはMACアドレスでも、デバイス名でもいけるよう。
@@ -11,30 +12,56 @@ class DeviceManager {
     val devices = mutableStateListOf<BLEDevice>()
     var selectedDevice: BLEDevice? = null
 
-    //fun upsert(device: BLEDevice) {
-    //    val index = devices.indexOfFirst {
-    //        it.address == device.address
-    //    }
-    //    if (index == -1) {
-    //        devices.add(device)
-    //    } else {
-    //        devices[index] = device
-    //    }
-    //}
-    fun upsert(device: BLEDevice) {
-        val index = devices.indexOfFirst { it.address == device.address }
-
+    fun upsert(
+        address: String,
+        name: String?,
+        rssi: Int
+    ) {
+        val index = devices.indexOfFirst { it.address == address }
         if (index == -1) {
-            devices.add(device)
+            devices.add(
+                BLEDevice(
+                    name = name ?: "Unknown",
+                    address = address,
+                    rssi = rssi,
+                    connectState = ConnectState.DISCONNECTED
+                )
+            )
             return
         }
 
         val old = devices[index]
+        devices[index] = old.copy(
+            name = name ?: old.name,
+            rssi = rssi
+        )
+    }
 
-        // 完全一致なら更新しない（軽量化）
-        if (old == device) return
+    fun updateConnectState(
+        address: String,
+        state: ConnectState
+    ) {
+        update(address) {old -> old.copy(connectState = state)}
+    }
 
-        devices[index] = device
+    fun updateService(
+        address: String,
+        services: List<BLEServiceInfo>
+    ) {
+        update(address) {old -> old.copy(services = services)}
+    }
+
+    fun update(
+        address: String,
+        block: (BLEDevice) -> BLEDevice
+    ) {
+        Log.d("DEVICE_DEBUG", "updateConnectionState $address -> $devices.state")
+        val index = devices.indexOfFirst { it.address == address }
+        Log.d("DEVICE_DEBUG", "index=$index")
+        if (index == -1) return
+
+        val old = devices[index]
+        devices[index] = block(old)
     }
 
     fun clear() {

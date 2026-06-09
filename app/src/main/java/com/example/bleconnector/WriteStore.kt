@@ -24,9 +24,6 @@ class WriteStore {
     fun failed(charUuid: String, input: String, code: Int) {
         add(charUuid, input, "FAILED", code)
     }
-    fun unknown(charUuid: String, input: String) {
-        add(charUuid, input, "UNKNOWN", null)
-    }
 
     private fun add(
         charUuid: String,

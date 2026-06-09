@@ -108,8 +108,12 @@ fun BLEConnectScreen(
                             type = filterType,
                             text = filterText
                         )
-                    ) { device ->
-                        deviceManager.upsert(device)
+                    ) { result ->
+                        deviceManager.upsert(
+                            address = result.device.address,
+                            name = result.device.name,
+                            rssi = result.rssi
+                        )
                     }
 
                     isScanning = true

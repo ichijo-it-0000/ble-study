@@ -17,7 +17,7 @@ class BLEScanner(private val bluetoothLeScanner: BluetoothLeScanner) {
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     fun startScanBLEDevices(
         filterState: ScanFilterState,
-        onResult: (BLEDevice) -> Unit
+        onResult: (ScanResult) -> Unit
     ) {
         scanCallback?.let {
             bluetoothLeScanner.stopScan(it)
@@ -56,15 +56,8 @@ class BLEScanner(private val bluetoothLeScanner: BluetoothLeScanner) {
             override fun onScanResult(callbackType: Int, result: ScanResult?) {
                 super.onScanResult(callbackType, result)
 
-                val device = result?.device ?: return
-                val bleDevice = BLEDevice(
-                    name = device.name ?: "Unknown",
-                    address = device.address,
-                    rssi = result.rssi,
-                    connectState = ConnectState.DISCONNECTED
-                )
-
-                onResult(bleDevice)
+                val r = result ?: return
+                onResult(r)
             }
         }
 

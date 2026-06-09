@@ -57,10 +57,8 @@ class BLEConnector(
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(device: BLEDevice) {
-        val connecting = device.copy(
-            connectState = ConnectState.CONNECTING
-        )
-        deviceManager.upsert(connecting)
+        deviceManager.updateConnectState(device.address, ConnectState.CONNECTING)
+
         val bluetoothManager =
             context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
 
@@ -85,26 +83,20 @@ class BLEConnector(
 
                     if (status != BluetoothGatt.GATT_SUCCESS) {
                         Log.e("BLE", "Connection failed status=$status")
-                        disconnect(context)
+                        disconnect(context, device.address)
                         return
                     }
 
                     when (newState) {
                         BluetoothProfile.STATE_CONNECTED -> {
                             Log.d("BLE", "CONNECTED")
-                            val connected = device.copy(
-                                connectState = ConnectState.CONNECTED
-                            )
-                            deviceManager.upsert(connected)
+                            deviceManager.updateConnectState(device.address, ConnectState.CONNECTED)
                             gatt.discoverServices()
                         }
 
                         BluetoothProfile.STATE_DISCONNECTED -> {
                             Log.d("BLE", "DISCONNECTED")
-                            deviceManager.upsert(
-                                device.copy(connectState = ConnectState.DISCONNECTED)
-                            )
-                            disconnect(context)
+                            disconnect(context, device.address)
                         }
                     }
                 }
@@ -139,13 +131,7 @@ class BLEConnector(
                             }
                         )
                     }
-
-                    val updated = device.copy(
-                        connectState = ConnectState.CONNECTED,
-                        services = services
-                    )
-
-                    deviceManager.upsert(updated)
+                    deviceManager.updateService(device.address, services)
 
                     // Permission check.
                     if (
@@ -220,12 +206,17 @@ class BLEConnector(
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun disconnect(context: Context) {
+    fun disconnect(context: Context, address: String) {
         if (ActivityCompat.checkSelfPermission(
                 context,
                 Manifest.permission.BLUETOOTH_CONNECT
             ) != PackageManager.PERMISSION_GRANTED
         ) return
+
+        deviceManager.updateConnectState(
+            address,
+            ConnectState.DISCONNECTED
+        )
 
         bluetoothGatt?.close()
         bluetoothGatt = null
