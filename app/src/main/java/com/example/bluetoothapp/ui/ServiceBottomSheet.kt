@@ -95,7 +95,13 @@ fun LogDisplayArea(characteristics: List<CharacteristicInfo>) {
                             style = MaterialTheme.typography.labelSmall
                         )
                         Text(text = "HEX: $hex", style = MaterialTheme.typography.bodySmall)
-                        Text(text = "TEXT: $asText", style = MaterialTheme.typography.bodySmall)
+                        // battery levelはhexから10進数に変換して表示
+                        if (log.uuid.equals("00002a19-0000-1000-8000-00805f9b34fb", ignoreCase = true) && log.value.isNotEmpty()) {
+                            val batteryLevel = log.value[0].toInt() and 0xFF
+                            Text(text = "Battery Level: $batteryLevel%", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Text(text = "TEXT: $asText", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }

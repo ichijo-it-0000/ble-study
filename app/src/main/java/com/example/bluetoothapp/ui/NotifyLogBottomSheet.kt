@@ -41,7 +41,12 @@ fun NotifyLogBottomSheet(onDismiss: () -> Unit) {
                         )
                         Text(text = "Service Name :  $characteristicName")
                         Text(text = "Received Data(HEX):  ${log.value.joinToString(" ") { "%02X".format(it) }}")
-                        Text(text = "Received Data(UTF-8):  ${String(log.value)}")
+                        if (characteristicName == "Battery Level" && log.value.isNotEmpty()) {
+                            val batteryLevel = log.value[0].toInt() and 0xFF
+                            Text(text = "Battery Level: $batteryLevel%")
+                        } else {
+                            Text(text = "Received Data(UTF-8):  ${String(log.value)}")
+                        }
                     }
                 }
             }
