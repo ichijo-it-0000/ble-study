@@ -39,7 +39,7 @@ fun NotifyLogBottomSheet(onDismiss: () -> Unit) {
                             modifier = Modifier.padding(vertical = 8.dp),
                             thickness = 1.dp
                         )
-                        Text(text = "Service Name :  $characteristicName")
+                        Text(text = "Characteristic Name :  $characteristicName")
                         Text(text = "Received Data(HEX):  ${log.value.joinToString(" ") { "%02X".format(it) }}")
                         if (characteristicName == "Battery Level" && log.value.isNotEmpty()) {
                             val batteryLevel = log.value[0].toInt() and 0xFF
