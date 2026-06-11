@@ -39,7 +39,7 @@ class BLEConnector(
     private var bluetoothGatt: BluetoothGatt? = null
 
     private companion object {
-        const val TAG = "BLE"
+        const val TAG = "BLE_CONNECT"
         // CCCD(Client Characteristic Configuration Descriptor)
         //   - UUID = 0x2902
         //   - Notify/Indicateの有効・無効を切り替えるDescriptor
@@ -77,25 +77,25 @@ class BLEConnector(
                     newState: Int
                 ) {
 
-                    Log.d("BLE", "STATE CHANGE: $newState status=$status")
-                    Log.d("BLE", "ADDRESS=${device.address}")
-                    Log.d("BLE", "THREAD=${Thread.currentThread().name}")
+                    Log.d(TAG, "STATE CHANGE: $newState status=$status")
+                    Log.d(TAG, "ADDRESS=${device.address}")
+                    Log.d(TAG, "THREAD=${Thread.currentThread().name}")
 
                     if (status != BluetoothGatt.GATT_SUCCESS) {
-                        Log.e("BLE", "Connection failed status=$status")
+                        Log.e(TAG, "Connection failed status=$status")
                         disconnect(context, device.address)
                         return
                     }
 
                     when (newState) {
                         BluetoothProfile.STATE_CONNECTED -> {
-                            Log.d("BLE", "CONNECTED")
+                            Log.d(TAG, "CONNECTED")
                             deviceManager.updateConnectState(device.address, ConnectState.CONNECTED)
                             gatt.discoverServices()
                         }
 
                         BluetoothProfile.STATE_DISCONNECTED -> {
-                            Log.d("BLE", "DISCONNECTED")
+                            Log.d(TAG, "DISCONNECTED")
                             disconnect(context, device.address)
                         }
                     }
@@ -108,7 +108,7 @@ class BLEConnector(
                     status: Int
                 ) {
                     Log.d(
-                        "BLE_DEBUG",
+                        TAG,
                         "CCCD DONE uuid=${descriptor.characteristic.uuid} status=$status"
                     )
                     writeNextDescriptor(gatt)
@@ -158,7 +158,7 @@ class BLEConnector(
                     characteristic: BluetoothGattCharacteristic
                 ) {
                     handleNotify(characteristic.uuid.toString(), characteristic.value)
-                    Log.d("BLE", "RECEIVED uuid=${characteristic.uuid} value=${characteristic.value.joinToString()}")
+                    Log.d(TAG, "RECEIVED uuid=${characteristic.uuid} value=${characteristic.value.joinToString()}")
                     notifyStore.add(
                         serviceUuid = characteristic.service.uuid.toString(),
                         charUuid = characteristic.uuid.toString(),
@@ -186,14 +186,14 @@ class BLEConnector(
                     status: Int
                 ) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
-                        Log.d("BLE", "WRITE SUCCESS: ${characteristic.uuid}")
+                        Log.d(TAG, "WRITE SUCCESS: ${characteristic.uuid}")
                         writeStore.success(
                             charUuid = characteristic.uuid.toString(),
                             input = "WRITE",
                             code = status
                         )
                     } else {
-                        Log.e("BLE", "WRITE FAILED: ${characteristic.uuid} status=$status")
+                        Log.e(TAG, "WRITE FAILED: ${characteristic.uuid} status=$status")
                         writeStore.failed(
                             charUuid = characteristic.uuid.toString(),
                             input = "WRITE",
@@ -217,7 +217,7 @@ class BLEConnector(
             address,
             ConnectState.DISCONNECTED
         )
-
+        Log.d("BLE_SERVICE", "disconnect $address.")
         bluetoothGatt?.close()
         bluetoothGatt = null
     }

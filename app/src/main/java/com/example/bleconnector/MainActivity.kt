@@ -43,70 +43,80 @@
 //   - https://developer.android.com/reference/android/bluetooth/BluetoothDevice
 
 package com.example.bleconnector
-import android.os.Build
-import android.os.Bundle // Activityが起動・復元されるときの情報の入れ物
-import androidx.activity.ComponentActivity // Androidアプリの画面そのものを作るクラス
 
 // Composeとは、一言でいうとXMLの代わりに、Kotlinだけで画面を作る仕組みのこと。
-import androidx.activity.compose.setContent // Compose UIを表示する入口
-import androidx.annotation.RequiresApi
-import androidx.navigation.compose.rememberNavController
-import com.example.bleconnector.ui.BLEConnectScreen
 
+import android.content.ComponentName
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Build
+import android.os.Bundle
+import android.os.IBinder
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
+import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.bleconnector.ui.BLEConnectScreen
 import com.example.bleconnector.ui.BLEDeviceDetailScreen
 
 class MainActivity : ComponentActivity() {
+    // BLEServiceはServiceConnection経由で非同期に初期化されるため、setContent実行時点ではnullとなる。
+    // そのため、UIはStateの変化を購読し再構成する必要がある。
+    private val bleServiceState = mutableStateOf<BLEService?>(null)
 
-    private lateinit var bleScanner: BLEScanner
-    private lateinit var bleConnector: BLEConnector
-    private val deviceManager = DeviceManager()
-    private val notifyStore = NotifyStore()
-    private val writeStore = WriteStore()
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as BLEService.LocalBinder
+            bleServiceState.value = binder.getService()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            bleServiceState.value = null
+        }
+    }
 
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val bluetoothManager =
-            getSystemService(BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
-        bleScanner = BLEScanner(
-            bluetoothManager.adapter.bluetoothLeScanner
-        )
-        bleConnector = BLEConnector(
-            context = this,
-            deviceManager = deviceManager,
-            notifyStore = notifyStore,
-            writeStore = writeStore
+        bindService(
+            Intent(this, BLEService::class.java),
+            connection,
+            BIND_AUTO_CREATE
         )
 
         // ここでCompose UIを開始して画面を構成する。
         setContent {
             val navController = rememberNavController()
-
             NavHost(
                 navController = navController,
                 startDestination = "scan"
             ){
                 composable("scan") {
-                    BLEConnectScreen(
-                        scanner = bleScanner,
-                        connector = bleConnector,
-                        deviceManager = deviceManager,
-                        navController = navController
-                    )
+                    bleServiceState.value?.let { service ->
+                        BLEConnectScreen(
+                            scanner = service.scanner,
+                            connector = service.connector,
+                            deviceManager = service.deviceManager,
+                            navController = navController
+                        )
+                    }
                 }
                 composable("detail/{address}") { backStackEntry ->
                     val address = backStackEntry.arguments?.getString("address")!!
-                    BLEDeviceDetailScreen(
-                        address = address,
-                        deviceManager = deviceManager,
-                        connector = bleConnector,
-                        navController = navController,
-                        notifyStore = notifyStore,
-                        writeStore = writeStore
-                    )
+                    bleServiceState.value?.let { service ->
+                        BLEDeviceDetailScreen(
+                            address = address,
+                            deviceManager = service.deviceManager,
+                            connector = service.connector,
+                            notifyStore = service.notifyStore,
+                            writeStore = service.writeStore,
+                            navController = navController
+                        )
+                    }
                 }
             }
         }

@@ -8,6 +8,7 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
 import kotlin.collections.emptyList
@@ -57,6 +58,12 @@ class BLEScanner(private val bluetoothLeScanner: BluetoothLeScanner) {
                 super.onScanResult(callbackType, result)
 
                 val r = result ?: return
+
+                android.util.Log.d(
+                    "BLE_SCAN",
+                    "onScanResult name=${r.device.name} addr=${r.device.address} rssi=${r.rssi}"
+                )
+
                 onResult(r)
             }
         }
@@ -80,7 +87,7 @@ class BLEScanner(private val bluetoothLeScanner: BluetoothLeScanner) {
         scanCallback?.let {
             bluetoothLeScanner.stopScan(it)
         }
-
+        Log.d("BLE_SERVICE", "stop scan.")
         scanCallback = null
     }
 }
