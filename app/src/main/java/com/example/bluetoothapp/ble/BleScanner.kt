@@ -64,4 +64,8 @@ class BleScanner(
             )
         }
     }
+
+    fun getScanningState(): Boolean {
+        return scanning
+    }
 }

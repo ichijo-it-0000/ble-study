@@ -21,6 +21,8 @@
 
     <!-- Required when the app needs approximate location access -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature
         android:name="android.hardware.bluetooth_le"
@@ -35,6 +37,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.BluetoothApp">
+    
+        <service
+        android:name=".service.BleService"
+        android:enabled="true"
+        android:exported="false" />
 
         <activity
             android:name=".MainActivity"

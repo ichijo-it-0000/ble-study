@@ -1,13 +1,10 @@
 package com.example.bluetoothapp
 
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
-import android.content.pm.PackageManager
+import android.Manifest
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.widget.addTextChangedListener
 import androidx.activity.ComponentActivity
 import androidx.core.app.ActivityCompat
@@ -23,17 +20,21 @@ import com.example.bluetoothapp.ui.DeviceList
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.remember
+import androidx.compose.material3.Text
 import com.example.bluetoothapp.ble.ServiceInfo
 import com.example.bluetoothapp.ui.NotifyLogBottomSheet
 import com.example.bluetoothapp.ui.ServiceBottomSheet
+import androidx.activity.OnBackPressedCallback
+import android.content.Context
+import android.content.Intent
+import androidx.annotation.RequiresPermission
+import com.example.bluetoothapp.service.BleService
+
 enum class SortType {
     LAST_SEEN,
     RSSI,
     NAME
 }
-
-private var SUCCESS = true
-private var FAILURE = false
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -53,28 +54,100 @@ class MainActivity : ComponentActivity() {
     private var filterText = ""
     private var sortType = SortType.LAST_SEEN
     private lateinit var composeView: ComposeView
+    private val isBleReady = mutableStateOf(false)
     private val visibleDevices = mutableStateListOf<BleDevice>()
     private val showServiceSheet = mutableStateOf(false)
     private val showLogSheet = mutableStateOf(false)
     private val selectedDevice = mutableStateOf<BleDevice?>(null)
 
+    private var bleService: BleService? = null
+    private var isBound = false
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d("MainActivity", "onCreate called.")
+
+        // Register BackHandler
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                Log.d("LIFECYCLE", "BackPressed handled. Cleaning up resources.")
+                cleanupAndFinish()
+            }
+        })
 
         // Create UI components
         setupUi()
-        // Initialize BLE manager
-        if (!initializeBle()){
-            // terminate Main Activity.
-            finish()
-            return
-        }
         // Request runtime permissions
         requestPermissionsIfNeeded()
-        // Register UI event listeners
-        setupListeners()
     }
 
+    override fun onStart() {
+        Log.d("MainActivity", "onStart called.")
+        super.onStart()
+        val intent = Intent(this, BleService::class.java)
+        startService(intent)
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (!isBleReady.value) return
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!isBleReady.value) return
+        updateDeviceList()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isBleReady.value) return
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d("LIFECYCLE", "onDestroy called")
+
+        isBleReady.value = false
+        unbindService()
+    }
+
+    private fun cleanupAndFinish() {
+        stopService(Intent(this, BleService::class.java))
+        finish()
+    }
+
+    private fun unbindService() {
+        if (isBound) {
+            unbindService(serviceConnection)
+            isBound = false
+        }
+    }
+
+    private val serviceConnection = object : android.content.ServiceConnection {
+        override fun onServiceConnected(name: android.content.ComponentName, service: android.os.IBinder) {
+            val binder = service as BleService.LocalBinder
+            bleService = binder.getService()
+            bleManager = bleService!!.getBleManager()
+            isBound = true
+            Log.d("MainActivity", "BleService connected, BleManager obtained")
+
+            bleManager.setOnDevicesUpdated { updateDeviceList() }
+            setupListeners()
+            isBleReady.value = true
+            updateDeviceList()
+        }
+
+        override fun onServiceDisconnected(name: android.content.ComponentName) {
+            isBound = false
+            isBleReady.value = false
+            Log.d("MainActivity", "BleService disconnected")
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun setupUi() {
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -117,6 +190,10 @@ class MainActivity : ComponentActivity() {
 
         setContentView(rootLayout)
         composeView.setContent {
+            if (!isBleReady.value) {
+                Text(text = "Connecting BRE Service...")
+                return@setContent
+            }
             val serviceList = remember { mutableStateListOf<ServiceInfo>()}
 
             DeviceList(
@@ -153,26 +230,6 @@ class MainActivity : ComponentActivity() {
                 NotifyLogBottomSheet(onDismiss = { showLogSheet.value = false })
             }
         }
-    }
-
-    private fun initializeBle(): Boolean {
-        if(!packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)){
-            Log.e("MainActivity", "BLE is not supported.")
-            return FAILURE
-        }
-        val bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
-        val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
-
-        if(bluetoothAdapter == null){
-            Log.e("MainActivity", "Bluetooth functionally is unavailable on this device.")
-            return FAILURE
-        }
-        bleManager = BleManager(
-            context = this,
-            bluetoothAdapter = bluetoothAdapter,
-            onDevicesUpdated = { updateDeviceList() }
-        )
-        return SUCCESS
     }
 
     private fun requestPermissionsIfNeeded() {

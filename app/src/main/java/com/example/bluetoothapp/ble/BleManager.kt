@@ -11,14 +11,14 @@ import android.bluetooth.BluetoothGattService
 class BleManager(
     private val context: Context,
     bluetoothAdapter: BluetoothAdapter,
-    private val onDevicesUpdated: () -> Unit
 ) {
+    private var onDevicesUpdated: (() -> Unit)? = null
     private val registry = DeviceRegistry()
     private val scanner = BleScanner(
         bluetoothAdapter = bluetoothAdapter,
         onDeviceFound = { device ->
             registry.addOrUpdate(device)
-            onDevicesUpdated()
+            onDevicesUpdated?.invoke()
         }
     )
 
@@ -28,13 +28,13 @@ class BleManager(
         onConnected = { device ->
             Log.i("BleManager", "CONNECTED : ${device.address}")
             registry.setConnectionState(device.address, ConnectionState.DISCOVERING_SERVICES)
-            onDevicesUpdated()
+            onDevicesUpdated?.invoke()
         },
 
         onDisconnected = { device ->
             Log.i("BleManager", "DISCONNECTED : ${device.address}")
             registry.setConnectionState(device.address, ConnectionState.DISCONNECTED)
-            onDevicesUpdated()
+            onDevicesUpdated?.invoke()
         },
         onServicesDiscovered = ::handleServicesDiscovered
     )
@@ -68,7 +68,7 @@ class BleManager(
         Log.i("BleManager", "CONNECT START : ${device.address}")
 
         registry.setConnectionState(device.address, ConnectionState.CONNECTING)
-        onDevicesUpdated()
+        onDevicesUpdated?.invoke()
         connector.connect(device.bluetoothDevice)
     }
 
@@ -80,7 +80,7 @@ class BleManager(
             "disconnect request state=${device.connectionState}"
         )
         registry.setConnectionState(device.address, ConnectionState.DISCONNECTING)
-        onDevicesUpdated()
+        onDevicesUpdated?.invoke()
         connector.disconnect()
     }
 
@@ -137,7 +137,13 @@ class BleManager(
         }
         currentDeviceAddress?.let {
         registry.setConnectionState(it, ConnectionState.CONNECTED)
-        onDevicesUpdated()
+        onDevicesUpdated?.invoke()
         }
+    }
+
+    fun getScannerState(): Boolean = scanner.getScanningState()
+
+    fun setOnDevicesUpdated( callback: () -> Unit) {
+        onDevicesUpdated = callback
     }
 }
